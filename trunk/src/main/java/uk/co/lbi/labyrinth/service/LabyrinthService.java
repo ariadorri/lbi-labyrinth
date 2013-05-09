@@ -4,6 +4,6 @@ import uk.co.lbi.labyrinth.jaxb.Location;
 
 public interface LabyrinthService {
 
-	Location checkPath(String location, boolean start);
+	Location checkPath(String location);
 
 }
