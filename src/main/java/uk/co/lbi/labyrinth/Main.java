@@ -1,15 +1,14 @@
 package uk.co.lbi.labyrinth;
 
-import java.util.ArrayList;
+import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Set;
 
 import javax.swing.JOptionPane;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.FileUtils;
 import org.springframework.util.StringUtils;
 
 import uk.co.lbi.labyrinth.domain.Route;
@@ -20,72 +19,68 @@ import uk.co.lbi.labyrinth.service.LabyrinthServiceSpringImpl;
 
 public class Main {
 
-	private static enum MazeNames {
+	public static enum MazeNames {
 		easy, pacman, glasgow;
 	}
+
+	private static String RESULT = "labytinth.txt";
 
 	private LabyrinthService labyrinthService = new LabyrinthServiceSpringImpl(
 			"http://labyrinth.lbi.co.uk");
 	private static int counter = 0;
 
 	public Route solveLabyrinth(MazeNames maze, String source, String destination,
-			LocationTypes endCriteria, HashSet<String> checkedRoutes) {
+			LocationTypes endCriteria, HashSet<Integer> checkedNodes) {
 		counter++;
-		boolean start = checkedRoutes == null;
-		Route route = new Route();
-		List<String> exits = new ArrayList<String>();
-		Location locationResult = labyrinthService.checkPath(destination, start);
-		if (!start) {
-			checkedRoutes.add(destination);
+		if (checkedNodes == null) {
+			checkedNodes = new HashSet<Integer>();
 		}
-		if (locationResult != null) {
-			if (start) {
-				checkedRoutes = new HashSet<String>();
-				checkedRoutes.add("/Maze/Location/" + maze.name() + "/"
-						+ locationResult.getLocationId());
-			}
-			route.next(locationResult);
-			exits.addAll(locationResult.getExits());
-			if (endCriteria.equals(route.getResult())) {
-				return route;
-			} else if (LocationTypes.PowerPill.equals(route.getResult())) {
-				route.addPowerPills(locationResult.getLocationId());
-			}
-			Route shortestRoute = null;
-			for (String exit : exits) {
-				if (!checkedRoutes.contains(exit) && !exit.equals(source)) {
-					@SuppressWarnings("unchecked")
-					Route newRoute = solveLabyrinth(maze, destination, exit, endCriteria,
-							(HashSet<String>) checkedRoutes.clone());
-					if (newRoute != null) {
-						boolean noShortestRoot = shortestRoute == null;
-						boolean newRouteShorter = !noShortestRoot
-								&& newRoute.length() < shortestRoute.length();
-						boolean newRouteHasPowerPills = newRoute.numberOfPowerPills() > 0;
-						boolean shortestRouteHasPowerPills = !noShortestRoot
-								&& shortestRoute.numberOfPowerPills() > 0;
-						if (noShortestRoot
-								|| (newRouteHasPowerPills && !shortestRouteHasPowerPills)
-								|| (newRouteHasPowerPills && shortestRouteHasPowerPills && newRouteShorter)
-								|| (!newRouteHasPowerPills && !shortestRouteHasPowerPills && newRouteShorter)) {
-							shortestRoute = newRoute;
-						}
-					}
+		Route route = new Route();
+		Set<String> exits = new HashSet<String>();
+		Location locationResult = labyrinthService.checkPath(destination);
+		String node = "/Maze/Location/" + maze.name() + "/" + locationResult.getLocationId();
+		checkedNodes.add(node.hashCode());
+		route.next(locationResult);
+		exits.addAll(locationResult.getExits());
+		if (endCriteria.equals(route.getResult())) {
+			return route;
+		} else if (LocationTypes.PowerPill.equals(route.getResult())) {
+			route.addPowerPills(locationResult.getLocationId());
+		}
+		Route shortestRoute = null;
+		for (String exit : exits) {
+			if (!checkedNodes.contains(exit.hashCode()) && !exit.equals(source)) {
+				@SuppressWarnings("unchecked")
+				Route newRoute = solveLabyrinth(maze, destination, exit, endCriteria,
+						(HashSet<Integer>) checkedNodes.clone());
+				if (!endCriteria.equals(newRoute.getResult())) {
+					continue;
+				}
+				boolean noShortestRoot = shortestRoute == null;
+				boolean newRouteShorter = !noShortestRoot
+						&& newRoute.length() < shortestRoute.length();
+				boolean newRouteHasPowerPills = newRoute.numberOfPowerPills() > 0;
+				boolean shortestRouteHasPowerPills = !noShortestRoot
+						&& shortestRoute.numberOfPowerPills() > 0;
+				if (noShortestRoot
+						|| (newRouteHasPowerPills && !shortestRouteHasPowerPills)
+						|| (newRouteHasPowerPills && shortestRouteHasPowerPills && newRouteShorter)
+						|| (!newRouteHasPowerPills && !shortestRouteHasPowerPills && newRouteShorter)) {
+					shortestRoute = newRoute;
 				}
 			}
-			if (shortestRoute != null) {
-				route.continueTo(shortestRoute);
-				return route;
-			}
 		}
-		return null;
+		if (shortestRoute != null) {
+			route.continueTo(shortestRoute);
+		}
+		return route;
 	}
 
 	private void initialize() {
 		counter = 0;
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		MazeNames maze = (MazeNames) JOptionPane.showInputDialog(null,
 				"Select the maze you want to solve:", "Solve Maze", JOptionPane.QUESTION_MESSAGE,
 				null, MazeNames.values(), MazeNames.easy);
@@ -100,21 +95,14 @@ public class Main {
 		String pills = StringUtils.arrayToCommaDelimitedString(route.getPowerPills().toArray(
 				new String[0]));
 
-		JTextArea textArea = new JTextArea(10, 50);
-		JScrollPane pane = new JScrollPane(textArea);
-		textArea.setOpaque(false);
-		textArea.setEditable(false);
-		textArea.setLineWrap(true);
-		textArea.setWrapStyleWord(true);
-
+		String result = "";
 		String content = String.valueOf(counter);
 		content += "\nMaze has been completed in " + route.getPath().size()
 				+ " steps, using the following path:\n" + path + "\nand having eaten "
 				+ route.numberOfPowerPills() + " power pills in the following locations: \n"
 				+ pills;
 
-		textArea.setText(content);
-		JOptionPane.showMessageDialog(null, pane, "Result", JOptionPane.INFORMATION_MESSAGE);
+		result += content;
 
 		main.initialize();
 		route = main.solveLabyrinth(maze, "",
@@ -130,8 +118,8 @@ public class Main {
 				+ " steps, using the following path:\n" + path + "\nand having eaten "
 				+ route.numberOfPowerPills() + " power pills in the following locations: \n"
 				+ pills;
-		textArea.setText(content);
-		JOptionPane.showMessageDialog(null, pane, "Reverse Result", JOptionPane.INFORMATION_MESSAGE);
+		result += content;
+		FileUtils.writeStringToFile(new File(RESULT), result);
 	}
 
 }

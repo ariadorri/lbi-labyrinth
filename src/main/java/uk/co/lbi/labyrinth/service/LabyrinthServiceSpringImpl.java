@@ -3,7 +3,6 @@ package uk.co.lbi.labyrinth.service;
 import java.util.HashMap;
 import java.util.Map;
 
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.http.HttpMethod;
@@ -26,15 +25,14 @@ public class LabyrinthServiceSpringImpl implements LabyrinthService {
 		this.endpoint = endpoint;
 	}
 
-	public Location checkPath(String location, boolean start) {
-		if (simpleCache.containsKey(location)) {
-			log.debug("RETURNING CACHED VALUE");
-			return simpleCache.get(location);
+	public Location checkPath(String location) {
+		synchronized (simpleCache) {
+			if (simpleCache.containsKey(location)) {
+				log.debug("RETURNING CACHED VALUE");
+				return simpleCache.get(location);
+			}
 		}
 		HttpMethod method = HttpMethod.POST;
-		if (start) {
-			method = HttpMethod.GET;
-		}
 		try {
 			ResponseEntity<Location> response = restTemplate.exchange(endpoint + location, method,
 					null, Location.class);
