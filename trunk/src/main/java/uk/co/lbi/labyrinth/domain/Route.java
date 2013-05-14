@@ -7,7 +7,6 @@ import java.util.Set;
 
 import uk.co.lbi.labyrinth.jaxb.Location;
 
-
 public class Route {
 	public enum LocationTypes {
 		Start, Exit, Normal, PowerPill;
@@ -57,6 +56,10 @@ public class Route {
 
 	public int numberOfPowerPills() {
 		return powerPills.size();
+	}
+
+	public boolean hasPowerPill(String location) {
+		return powerPills.contains(location);
 	}
 
 }
